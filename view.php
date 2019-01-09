@@ -150,10 +150,8 @@ foreach ($enrolments as $enrolment) {
 			$rolecontextid = $DB->get_field('context', 'id', array('instanceid' => $courseid, 'contextlevel' => 50)); //CONTEXT_COURSE
 			//$roleassignment = $DB->get_record('role_assignments', array('userid' => $enrolment->userid, 'contextid' => $rolecontext->id, 'modifierid' => $modifierid));
 			$roleassignmentroleid = $DB->get_field('role_assignments', 'roleid', array('userid' => $enrolment->userid, 'contextid' => $rolecontextid, 'modifierid' => $modifierid));
-			//$role = $DB->get_record('role', array('id' => $roleassignment->roleid));
-			//$rolename .= '|'.$rolecontextid.'|'.$modifierid.'|'.$enrolment->userid.'|'.$roleassignmentroleid;
 			if ($role = $DB->get_record('role', array('id' => $roleassignmentroleid))) {
-				$rolename = $role->shortname;		
+				$rolename = $role->shortname;
 				$class =   '';
 				$is_deleted = false;
 			}
