@@ -8,9 +8,13 @@ require_login();
 $sort = optional_param('tsort', 'time', PARAM_RAW);
 $sortdir = optional_param('tsortdir', 'ASC', PARAM_RAW);
 
+//echo date('m/d/y', time());
+$f_from = strtotime(date('m/d/y', time()));
+$f_to = $f_from + 60 * 60 * 24 - 1;
+
 $f_role = optional_param('f_role', 'all', PARAM_RAW);
-$f_from = optional_param('f_from', '', PARAM_RAW);
-$f_to = optional_param('f_to', '', PARAM_RAW);
+$f_from = optional_param('f_from', $f_from, PARAM_RAW);
+$f_to = optional_param('f_to', $f_to, PARAM_RAW);
 $action = optional_param('action', '', PARAM_RAW);
 
 $context = context_system::instance();
