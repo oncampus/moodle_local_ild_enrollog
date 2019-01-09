@@ -137,7 +137,9 @@ foreach ($enrolments as $enrolment) {
 	$is_deleted = true;
 	// Rolle aus local_ild_enrollog holen falls dort datensatz vorhanden ist. Ansonsten wie gehabt...
 	//if ($userenrolment = $DB->get_record('user_enrolments', array('id' => $userenrolmentid, 'userid' => $enrolment->userid))) {
+		
 	if ($userenrolment = $DB->get_field('user_enrolments', 'id', array('id' => $userenrolmentid, 'userid' => $enrolment->userid))) {
+		
 		if (isset($role)) {
 			$rolename = $role;
 			$class =   '';
@@ -147,8 +149,9 @@ foreach ($enrolments as $enrolment) {
 			//$rolecontext = $DB->get_record('context', array('instanceid' => $courseid, 'contextlevel' => 50)); //CONTEXT_COURSE
 			$rolecontextid = $DB->get_field('context', 'id', array('instanceid' => $courseid, 'contextlevel' => 50)); //CONTEXT_COURSE
 			//$roleassignment = $DB->get_record('role_assignments', array('userid' => $enrolment->userid, 'contextid' => $rolecontext->id, 'modifierid' => $modifierid));
-			$roleassignmentroleid = $DB->get_field('role_assignments', 'roleid', array('userid' => $enrolment->userid, 'contextid' => $rolecontext->id, 'modifierid' => $modifierid));
+			$roleassignmentroleid = $DB->get_field('role_assignments', 'roleid', array('userid' => $enrolment->userid, 'contextid' => $rolecontextid, 'modifierid' => $modifierid));
 			//$role = $DB->get_record('role', array('id' => $roleassignment->roleid));
+			//$rolename .= '|'.$rolecontextid.'|'.$modifierid.'|'.$enrolment->userid.'|'.$roleassignmentroleid;
 			if ($role = $DB->get_record('role', array('id' => $roleassignmentroleid))) {
 				$rolename = $role->shortname;		
 				$class =   '';
@@ -158,8 +161,10 @@ foreach ($enrolments as $enrolment) {
 	}
 	else {
 		//if ($deleted = $DB->get_record_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
-		// TODO old_enrolments
+		// old_enrolments
+		
 		if (isset($enrolment->old) and $enrolment->old == true) {
+			
 			if ($deleted = $DB->get_record_sql('SELECT id, name FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
 				$exploded2 = explode('_', $deleted->name);
 				$rolename = get_string('deleted').' ('.date('d.m.Y - H:i', $exploded2[6]).')';
