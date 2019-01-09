@@ -50,17 +50,23 @@ else if ($fromform = $mform->get_data()) {
 	$to = $to + 60 * 60 * 24 - 1;
 	//echo ' / '.date('H:i:s - d.m.Y', $to);
 	
-	$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
+	//$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
+	$enrolments = $DB->get_records_sql('SELECT * FROM {local_ild_enrollog} WHERE event = :event AND timecreated >= :from AND timecreated <= :to ', 
+										array('event' => 'user_enrolled', 'from' => $from, 'to' => $to));
 } 
 else if ($f_from != '' and $f_to != '') {
 	$filterrole = $f_role;
 	$from = $f_from;
 	$to = $f_to;
-	$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
+	//$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
+	$enrolments = $DB->get_records_sql('SELECT * FROM {local_ild_enrollog} WHERE event = :event AND timecreated >= :from AND timecreated <= :to ', 
+										array('event' => 'user_enrolled', 'from' => $from, 'to' => $to));
 }
 else {
-	// TODO: limit
-	$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ?', array('local_ild_enrollog_user_enrolled_%'));
+	// TODO: limit (Seitenweise anzeigen)
+	//$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ?', array('local_ild_enrollog_user_enrolled_%'));
+	$enrolments = $DB->get_records_sql('SELECT * FROM {local_ild_enrollog} WHERE event = :event ', 
+										array('event' => 'user_enrolled'));
 }
 
 $all = 0;
@@ -70,27 +76,36 @@ $tabledata = array();
 
 foreach ($enrolments as $enrolment) {
 	//$all++;
+	/*
 	$exploded = explode('_', $enrolment->name);
 	$userenrolmentid = $exploded[5];
 	$courseid = $exploded[6];
 	$modifierid = $exploded[7];
+	*/
+	$userenrolmentid = $enrolment->enrolmentid;
+	$courseid = $enrolment->courseid;
+	$modifierid = $enrolment->modifierid;
+	$role = $enrolment->role;
 	
-	if ($user = $DB->get_record('user', array('id' => $enrolment->userid))) {
+	//if ($user = $DB->get_record('user', array('id' => $enrolment->userid))) {
+	if ($user = $DB->get_record_sql('SELECT id, firstname, lastname, email, city FROM {user} WHERE id = :id', array('id' => $enrolment->userid))) {
 		$fullname = '<a href="'.$CFG->wwwroot.'/user/view.php?id='.$user->id.'">'.$user->firstname.' '.$user->lastname.' ('.$user->email.')</a>';
 	}
 	else {
 		$fullname = get_string('deleted');
 	}
 	
-	if ($muser = $DB->get_record('user', array('id' => $modifierid))) {
+	//if ($muser = $DB->get_record('user', array('id' => $modifierid))) {
+	if ($muser = $DB->get_record_sql('SELECT id, firstname, lastname, email FROM {user} WHERE id = :id', array('id' => $modifierid))) {
 		$mfullname = '<a href="'.$CFG->wwwroot.'/user/view.php?id='.$muser->id.'">'.$muser->firstname.' '.$muser->lastname.' ('.$muser->email.')</a>';
 	}
 	else {
 		$mfullname = get_string('deleted');
 	}
 	
-	if ($course = $DB->get_record('course', array('id' => $courseid))) {
-		$coursename = '<a href="'.$CFG->wwwroot.'/enrol/users.php?id='.$course->id.'">'.$course->fullname.'</a>';
+	//if ($course = $DB->get_record('course', array('id' => $courseid))) {
+	if ($course = $DB->get_record_sql('SELECT id, fullname FROM {course} WHERE id = :id', array('id' => $courseid))) {
+		$coursename = '<a href="'.$CFG->wwwroot.'/user/index.php?id='.$course->id.'">'.$course->fullname.'</a>';
 		$courseshortname = $course->fullname;
 	}
 	else {
@@ -101,18 +116,21 @@ foreach ($enrolments as $enrolment) {
 	$rolename = get_string('deleted');
 	$class =   'dimmed_text';
 	$is_deleted = true;
-	// TODO: Rolle aus user_preferences holen falls dort datensatz vorhanden ist. Ansonsten wie gehabt...
-	if ($userenrolment = $DB->get_record('user_enrolments', array('id' => $userenrolmentid, 'userid' => $enrolment->userid))) {
-		if (count($exploded) == 9) {
-			$rolename = $exploded[8];
+	// Rolle aus local_ild_enrollog holen falls dort datensatz vorhanden ist. Ansonsten wie gehabt...
+	//if ($userenrolment = $DB->get_record('user_enrolments', array('id' => $userenrolmentid, 'userid' => $enrolment->userid))) {
+	if ($userenrolment = $DB->get_field('user_enrolments', 'id', array('id' => $userenrolmentid, 'userid' => $enrolment->userid))) {
+		if (isset($role)) {
+			$rolename = $role;
 			$class =   '';
 			$is_deleted = false;
 		}
 		else {
-			$rolecontext = $DB->get_record('context', array('instanceid' => $courseid, 'contextlevel' => 50)); //CONTEXT_COURSE
-			$roleassignment = $DB->get_record('role_assignments', array('userid' => $enrolment->userid, 'contextid' => $rolecontext->id, 'modifierid' => $modifierid));
+			//$rolecontext = $DB->get_record('context', array('instanceid' => $courseid, 'contextlevel' => 50)); //CONTEXT_COURSE
+			$rolecontextid = $DB->get_field('context', 'id', array('instanceid' => $courseid, 'contextlevel' => 50)); //CONTEXT_COURSE
+			//$roleassignment = $DB->get_record('role_assignments', array('userid' => $enrolment->userid, 'contextid' => $rolecontext->id, 'modifierid' => $modifierid));
+			$roleassignmentroleid = $DB->get_field('role_assignments', 'roleid', array('userid' => $enrolment->userid, 'contextid' => $rolecontext->id, 'modifierid' => $modifierid));
 			//$role = $DB->get_record('role', array('id' => $roleassignment->roleid));
-			if ($role = $DB->get_record('role', array('id' => $roleassignment->roleid))) {
+			if ($role = $DB->get_record('role', array('id' => $roleassignmentroleid))) {
 				$rolename = $role->shortname;		
 				$class =   '';
 				$is_deleted = false;
@@ -120,11 +138,14 @@ foreach ($enrolments as $enrolment) {
 		}
 	}
 	else {
-		if ($deleted = $DB->get_record_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
-			$exploded2 = explode('_', $deleted->name);
-			$rolename = get_string('deleted').' ('.date('d.m.Y - H:i', $exploded2[6]).')';
-			if (count($exploded) == 9) {
-				$rolename = $exploded[8].' - '.$rolename;
+		//if ($deleted = $DB->get_record_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
+		//if ($deleted = $DB->get_record_sql('SELECT id, name FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
+		if ($deleted = $DB->get_record_sql('SELECT id, timecreated FROM {local_ild_enrollog} WHERE event = :event AND enrolmentid = :enrolmentid ', array('event' => 'user_unenrolled', 'enrolmentid' => $userenrolmentid))) {
+			//$exploded2 = explode('_', $deleted->name);
+			//$rolename = get_string('deleted').' ('.date('d.m.Y - H:i', $exploded2[6]).')';
+			$rolename = get_string('deleted').' ('.date('d.m.Y - H:i', $deleted->timecreated).')';
+			if (isset($role)) {
+				$rolename = $role.' - '.$rolename;
 			}
 			//$rolename = get_string('deleted').' ('.$exploded2[5].')';
 		}
@@ -136,13 +157,14 @@ foreach ($enrolments as $enrolment) {
 	$data = new stdClass();
 	$data->fullname = $fullname;
 	$data->uname = $user->firstname.' '.$user->lastname;
+	$data->city = $user->city;
 	$data->coursename = $coursename;
 	$data->courseshortname = $courseshortname;
 	$data->courseid = $courseid;
 	$data->rolename = $rolename;//.' '.$userenrolmentid;
 	$data->mfullname = $mfullname;
 	$data->mname = $muser->firstname.' '.$muser->lastname;
-	$data->ttime = $enrolment->value;
+	$data->ttime = $enrolment->timecreated;
 	$data->tclass = $class;
 	$data->tsort = $sort;
 	$data->sortdir = $sortdir;
@@ -181,7 +203,7 @@ if ($action == 'xls') {
 	// Deckblatt
 	$sheets[0] = $workbook->add_worksheet('Einschreibungen');// es gibt keinen Kurs mit der id 0
 	
-	$columns = array('Name', 'Kurs', 'Rolle', 'angelegt von', 'Zeit');
+	$columns = array('Name', 'Kurs', 'Rolle', 'Ort', 'angelegt von', 'Zeit');
 	$col = 0;
 	$current_rows = array();
 	$deleted_rows = array(); 
@@ -199,8 +221,9 @@ if ($action == 'xls') {
 			$sheets[$td->courseid]->set_column(0, 0, 17); // Breite ändern
 			$sheets[$td->courseid]->set_column(1, 1, 34);
 			$sheets[$td->courseid]->set_column(2, 2, 34);
-			$sheets[$td->courseid]->set_column(3, 3, 17);
-			$sheets[$td->courseid]->set_column(4, 4, 18);
+			$sheets[$td->courseid]->set_column(3, 3, 34);
+			$sheets[$td->courseid]->set_column(4, 4, 17);
+			$sheets[$td->courseid]->set_column(5, 5, 18);
 			foreach ($columns as $column) {
 				$sheets[$td->courseid]->write_string($current_rows[$td->courseid], $col++, $column);
 			}
@@ -210,8 +233,9 @@ if ($action == 'xls') {
 		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 0, $td->uname);
 		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 1, $td->courseshortname);
 		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 2, $td->rolename);
-		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 3, $td->mname);
-		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 4, date('d.m.Y - H:i', $td->ttime));
+		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 3, $td->city);	// Ort	
+		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 4, $td->mname);
+		$sheets[$td->courseid]->write_string(($current_rows[$td->courseid] + 1), 5, date('d.m.Y - H:i', $td->ttime));
 		$current_rows[$td->courseid]++;
 		if ($td->deleted == true) {
 			$deleted_rows[$td->courseid]++;
@@ -240,7 +264,13 @@ if ($action == 'xls') {
 	$rows++;
 	$rows++;
 	foreach ($current_rows as $key => $value) {
-		$xlscourse = get_course($key);
+		try{
+			$xlscourse = get_course($key);
+		}
+		catch (Exception $e) {
+			$xlscourse = new stdClass();
+			$xlscourse->fullname = get_string('deleted');
+		}
 		$sheets[0]->write_string($rows, 1, $xlscourse->fullname.' ('.$key.')');
 		$sheets[0]->write_string($rows, 2, ($value - 1));
 		$count_participants = $count_participants + ($value - 1);

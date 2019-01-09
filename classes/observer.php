@@ -57,43 +57,72 @@ class local_ild_enrollog_observer {
 */
 		
 		global $DB;
-		
+
+        if (!get_config('local_ild_enrollog', 'active')) {
+            return;
+        }
+
+        $courses = get_config('local_ild_enrollog', 'courses');
+        $courseids = array();
+        if ($courses != '') {
+            $courseids = explode(',', $courses);
+            if (!in_array($event->courseid, $courseids)) {
+                return;
+            }
+        }
+
 		$user_enrolment = new stdClass();
-		$user_enrolment->id = $event->objectid;
+		$user_enrolment->enrolmentid = $event->objectid;
 		$user_enrolment->courseid = $event->courseid;
 		$user_enrolment->modifierid = $event->userid;
 		$user_enrolment->userid = $event->relateduserid;
-		$user_enrolment->timecreated = $event->timecreated;		
+		$user_enrolment->timecreated = $event->timecreated;
+		$user_enrolment->event = 'user_enrolled';
 		
 		$record = new stdClass();
 		$record->userid = $user_enrolment->userid;
 		// local_ild_enrollog_user_enrolled_userenrolmentid_courseid_modifierid
-		$record->name = 'local_ild_enrollog_user_enrolled_'.$user_enrolment->id.'_'.$user_enrolment->courseid.'_'.$user_enrolment->modifierid;
+		$record->name = 'local_ild_enrollog_user_enrolled_'.$user_enrolment->enrolmentid.'_'.$user_enrolment->courseid.'_'.$user_enrolment->modifierid;
 		$record->value = $user_enrolment->timecreated;
 		
-		$DB->insert_record('user_preferences', $record);
+		//$DB->insert_record('user_preferences', $record);
+		$DB->insert_record('local_ild_enrollog', $user_enrolment);
 		
 		return;
 	}
 
 	public static function user_unenrolled(\core\event\user_enrolment_deleted $event) {
 		global $USER, $DB;
+
+        if (!get_config('local_ild_enrollog', 'active')) {
+            return;
+        }
 		
 		$record = new stdClass();
 		$record->userid = $event->relateduserid;
 		$record->name = 'local_ild_enrollog_user_unenrolled_'.$event->userid.'_'.time();
 		$record->value = $event->objectid;
-		$DB->insert_record('user_preferences', $record);
+		//$DB->insert_record('user_preferences', $record);
+		
+		$user_enrolment = new stdClass();
+		$user_enrolment->enrolmentid = $event->objectid;
+		$user_enrolment->courseid = 0;//$event->courseid;
+		$user_enrolment->modifierid = $event->userid;
+		$user_enrolment->userid = $event->relateduserid;
+		$user_enrolment->timecreated = time();
+		$user_enrolment->event = 'user_unenrolled';
+		
+		$DB->insert_record('local_ild_enrollog', $user_enrolment);
 
 		return;
 	}
 	
 	public static function role_assigned(\core\event\role_assigned $event) {
 		global $USER, $DB;
-		if ($USER->username != 'riegerj') {
-			return;
-		}
-		
+
+        if (!get_config('local_ild_enrollog', 'active')) {
+            return;
+        }
 		
 		$sql = 'select * from mdl_user_preferences where userid = ? and name like ?';
 		
@@ -101,36 +130,58 @@ class local_ild_enrollog_observer {
 		$name = 'local_ild_enrollog_user_enrolled_%_'.$event->courseid.'_'.$event->userid;
 		$params = array($userid, $name);
 		
+		//$records = $DB->get_records_sql($sql, $params);
+		
+		$sql = 'SELECT * 
+				  FROM {local_ild_enrollog} 
+				 WHERE userid = :userid 
+				   AND event = :event 
+				   AND courseid = :courseid 
+				   AND modifierid = :modifierid ';
+		$params = array('userid' => $event->relateduserid,
+						'event' => 'user_enrolled',
+						'courseid' => $event->courseid,
+						'modifierid' => $event->userid);
 		$records = $DB->get_records_sql($sql, $params);
 		
-		$enrolids = array();
+		
+				   
 		foreach ($records as $record) {
-			$exploded = explode('_', $record->name);
-			$enrolmentid = $exploded[5];
+			
+			//$exploded = explode('_', $record->name);
+			//$enrolmentid = $exploded[5];
+			$enrolmentid = $record->enrolmentid;
 			
 			$sql = 'select * from mdl_user_preferences where userid = ? and name like ? and value = ?';
-			$name = 'local_ild_enrollog_user_unenrolled_'.$exploded[7].'_%';
+			$name = 'local_ild_enrollog_user_unenrolled_'.$exploded[7].'_%'; // $record->modifierid
 			$params = array($record->userid, $name, $enrolmentid);
+			
+			$sql = 'SELECT * 
+					  FROM {local_ild_enrollog} 
+					 WHERE userid = :userid 
+					   AND event = :event 
+					   AND modifierid = :modifierid 
+					   AND enrolmentid = :enrolmentid ';
+			$params = array('userid' => $record->userid,
+						    'event' => 'user_unenrolled',
+							'modifierid' => $record->modifierid,
+							'enrolmentid' => $record->enrolmentid);
+			
 			$records_unenrolled = $DB->get_records_sql($sql, $params);
+			
 			if (count($records_unenrolled) == 0) {
+				//print_object($record);
 				// Zu diesen Einschreibungs-Logdatensätzen existieren noch keine Ausschreibungsdatensätze
 				// und es ist auch noch keine Rolle angegeben
-				// TODO: rolle ermitteln und update des datensatzes
+				// rolle ermitteln und update des datensatzes
 				$role = $DB->get_record('role', array('id' => $event->objectid));
 				$role_shortname = $role->shortname;
-				$record->name = $record->name.'_'.$role_shortname;
-				$DB->update_record('user_preferences', $record);
-				//$enrolids[] = $enrolmentid;
+				//$record->name = $record->name.'_'.$role_shortname;
+				$record->role = $role_shortname;
+				//$DB->update_record('user_preferences', $record);
+				$DB->update_record('local_ild_enrollog', $record);
 			}
 		}
-		/*
-		ob_start();
-		print_object($event);
-		$out = ob_get_contents();
-		ob_end_clean();
-		
-		email_to_user($USER, $USER, 'debug', $out);
-		//*/
 		
 		return;
 	}

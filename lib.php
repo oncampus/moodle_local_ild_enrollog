@@ -7,11 +7,10 @@ function local_ild_enrollog_cron() {
 }
 
 function local_ild_enrollog_extend_settings_navigation($settingsnav, $context) {
+    /*
 	global $USER;
 	// TODO: devmode deaktivieren
-	if ($USER->username != 'riegerj') {
-		//return;
-	}
+
 
     if (!has_capability('moodle/site:config', context_system::instance())) {
         return;
@@ -43,8 +42,12 @@ function local_ild_enrollog_extend_settings_navigation($settingsnav, $context) {
         
 		//$foonode->make_active();
 
-        $settingnode->add_node($foonode);
+
+        if ($USER->username != 'riegerj') {
+            $settingnode->add_node($foonode);
+        }
 	}
+    */
 }
 
 ?>
