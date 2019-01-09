@@ -50,7 +50,7 @@ else if ($fromform = $mform->get_data()) {
 	$to = $to + 60 * 60 * 24 - 1;
 	//echo ' / '.date('H:i:s - d.m.Y', $to);
 	
-	//$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
+	$old_enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
 	$enrolments = $DB->get_records_sql('SELECT * FROM {local_ild_enrollog} WHERE event = :event AND timecreated >= :from AND timecreated <= :to ', 
 										array('event' => 'user_enrolled', 'from' => $from, 'to' => $to));
 } 
@@ -58,13 +58,13 @@ else if ($f_from != '' and $f_to != '') {
 	$filterrole = $f_role;
 	$from = $f_from;
 	$to = $f_to;
-	//$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
+	$old_enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value >= ? AND value <= ?', array('local_ild_enrollog_user_enrolled_%', $from, $to));
 	$enrolments = $DB->get_records_sql('SELECT * FROM {local_ild_enrollog} WHERE event = :event AND timecreated >= :from AND timecreated <= :to ', 
 										array('event' => 'user_enrolled', 'from' => $from, 'to' => $to));
 }
 else {
 	// TODO: limit (Seitenweise anzeigen)
-	//$enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ?', array('local_ild_enrollog_user_enrolled_%'));
+	$old_enrolments = $DB->get_records_sql('SELECT * FROM {user_preferences} WHERE name LIKE ?', array('local_ild_enrollog_user_enrolled_%'));
 	$enrolments = $DB->get_records_sql('SELECT * FROM {local_ild_enrollog} WHERE event = :event ', 
 										array('event' => 'user_enrolled'));
 }
@@ -73,6 +73,23 @@ $all = 0;
 $active = 0;
 $deleted_enrolments = 0;
 $tabledata = array();
+
+if (count($old_enrolments) > 0) {
+	foreach($old_enrolments as $old_enrolment) {
+		$exploded = explode('_', $old_enrolment->name);
+		$oe = new stdClass();
+		$oe->enrolmentid = $exploded[5];
+		$oe->courseid = $exploded[6];
+		$oe->modifierid = $exploded[7];
+		$oe->timecreated = $old_enrolment->value;
+		$oe->userid = $old_enrolment->userid;
+		if (count($exploded) == 9) {
+			 $oe->role = $exploded[8];
+		}
+		$oe->old = true;
+		$enrolments[] = $oe;
+	}
+}
 
 foreach ($enrolments as $enrolment) {
 	//$all++;
@@ -86,6 +103,8 @@ foreach ($enrolments as $enrolment) {
 	$courseid = $enrolment->courseid;
 	$modifierid = $enrolment->modifierid;
 	$role = $enrolment->role;
+	//$enrolment->timecreated
+	//$enrolment->userid
 	
 	//if ($user = $DB->get_record('user', array('id' => $enrolment->userid))) {
 	if ($user = $DB->get_record_sql('SELECT id, firstname, lastname, email, city FROM {user} WHERE id = :id', array('id' => $enrolment->userid))) {
@@ -139,10 +158,17 @@ foreach ($enrolments as $enrolment) {
 	}
 	else {
 		//if ($deleted = $DB->get_record_sql('SELECT * FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
-		//if ($deleted = $DB->get_record_sql('SELECT id, name FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
-		if ($deleted = $DB->get_record_sql('SELECT id, timecreated FROM {local_ild_enrollog} WHERE event = :event AND enrolmentid = :enrolmentid ', array('event' => 'user_unenrolled', 'enrolmentid' => $userenrolmentid))) {
-			//$exploded2 = explode('_', $deleted->name);
-			//$rolename = get_string('deleted').' ('.date('d.m.Y - H:i', $exploded2[6]).')';
+		// TODO old_enrolments
+		if (isset($enrolment->old) and $enrolment->old == true) {
+			if ($deleted = $DB->get_record_sql('SELECT id, name FROM {user_preferences} WHERE name LIKE ? AND value = ?', array('local_ild_enrollog_user_unenrolled_%', $userenrolmentid))) {
+				$exploded2 = explode('_', $deleted->name);
+				$rolename = get_string('deleted').' ('.date('d.m.Y - H:i', $exploded2[6]).')';
+				if (isset($role)) {
+					$rolename = $role.' - '.$rolename;
+				}
+			}
+		}
+		elseif ($deleted = $DB->get_record_sql('SELECT id, timecreated FROM {local_ild_enrollog} WHERE event = :event AND enrolmentid = :enrolmentid ', array('event' => 'user_unenrolled', 'enrolmentid' => $userenrolmentid))) {
 			$rolename = get_string('deleted').' ('.date('d.m.Y - H:i', $deleted->timecreated).')';
 			if (isset($role)) {
 				$rolename = $role.' - '.$rolename;
