@@ -14,22 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-
 /**
- * Local ild_catimage
  *
- * @package    local
- * @subpackage local_ild_catimage
- * @copyright  2017 Jan Rieger
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package     local_ild_enrollog
+ * @category    admin
+ * @copyright   2017 oncampus GmbH, <support@oncampus.de>
+ * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
  */
 
-defined('MOODLE_INTERNAL') || die;
-
-//if (has_capability('moodle/site:viewparticipants', $context)) {
-    //$ADMIN->add('root', new admin_category('enrollog', 'enrolment logging'));
-    //$ADMIN->add('enrollog', new admin_externalpage('enrollog_page', 'enrolment logging', $CFG->wwwroot . '/local/ild_enrollog/view.php'));
-//}
+defined('MOODLE_INTERNAL') || die();
 
 if ($hassiteconfig) {
     $settings = new admin_settingpage('local_ild_enrollog', get_string('pluginname', 'local_ild_enrollog'));
@@ -47,6 +41,7 @@ if ($hassiteconfig) {
     $setting = new admin_setting_configtextarea($name, $title, $description, '');
     $settings->add($setting);
 
-    $ADMIN->add('reports', new admin_externalpage('enrollog_page', get_string('pluginname', 'local_ild_enrollog'), $CFG->wwwroot . '/local/ild_enrollog/view.php'));
+    $ADMIN->add('reports', new admin_externalpage('enrollog_page', get_string('pluginname', 'local_ild_enrollog'),
+        $CFG->wwwroot . '/local/ild_enrollog/view.php'));
 }
 
